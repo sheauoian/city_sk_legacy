@@ -1,0 +1,109 @@
+command /city [<text>] [<text>] [<text>]:
+    permission: admin
+    trigger:
+        set {_} to arg-1
+        if arg-2 is not set:
+            if {_} is "list":
+                loop {City::*}:
+                    send "[%loop-index%] %loop-value%"
+            else:
+                send "/city list: 街のリストを表示"
+                send "/city create (街ID): 街を作成"
+                send "/city delete (街ID): 街を削除"
+                send "/city rename (街ID) (街名称): 街の名称を変更"
+                send "/city spawnpoint (街ID): 街のスポーン地点を実行者の地点に変更"
+                send "/city icon (街ID): 実行者のメインハンドのアイテムを街アイコンに設定"
+                send "/city: このリストを表示"
+        else:
+            arg-2 is not alphanumeric:
+                send "街IDは英数字である必要があります"
+                stop
+            set {_id} to arg-2
+            if {_} is "create":
+                {City::%{_id}%} is set:
+                    send "この街は既に存在します"
+                    stop
+                set {City::%{_id}%} to {_id}
+                set {City::%{_id}%::Icon} to grass
+                set {City::%{_id}%::Spawnpoint} to player's location
+                send "街[&b%{_id}%&f] を作成しました"
+            
+            else if {_} is "rename":
+                arg-3 is set:
+                    set {City::%{_id}%} to colored arg-3
+                    send "街[&b%{_id}%&f] の名前を %colored arg-3% &fに変更しました"
+                else:
+                    send "&7Usage: &f/city rename <街名称>"
+            
+            else if {_} is "spawnpoint":
+                set {City::%{_id}%::Spawnpoint} to player's location
+                send "街[&b%{_id}%&f] のスポーン地点を &7%player's location% &fに設定しました"
+            
+            else if {_} is "tp":
+                teleport player to {City::%{_id}%::Spawnpoint}
+            
+            else if {_} is "delete":
+                {City::%{_id}%} is set
+                delete {City::%{_id}%::*}
+                delete {City::%{_id}%}
+                send "街[&b%{_id}%&f] を削除しました"
+            
+            else if {_} is "icon":
+                player's tool is air:
+                    send "手にアイコンとなるアイテムを持ってください"
+                    stop
+                set {_I} to player's tool
+                set {_I}'s nbt to "{}"
+                set {City::%{_id}%::Icon} to {_I}
+                send "街[&b%{_id}%&f] のアイコンを &7%type of player's tool% &fに設定しました"
+            else if {_} is "setmayor":
+                set {_Mayor} to arg-3 parsed as a player
+                {_Mayor} is set
+                set {City::%{_id}%::Mayor} to {_Mayor}
+                send "街[&b%{_id}%&f] の町長を &e%{_Mayor}% &fに設定しました"
+                send "街[&b%{_id}%&f] の町長に任命されました" to {_Mayor}
+            else if {_} is "deletemayor":
+                delete {City::%{_id}%::Mayor}
+                send "街[&b%{_id}%&f] の町長を解任しました"
+tab complete of "/city":
+    set tab completions for position 1 to "create", "list", "tp", "spawnpoint", "delete", "icon", "setmayor", "deletemayor" and "rename"
+    if tab arg-1 = "tp", "spawnpoint", "delete", "icon", "setmayor", "deletemayor" or "rename":
+        loop {City::*}:
+            add loop-index to {_2::*}
+        set tab completions for position 2 to {_2::*}
+        if tab arg-1 = "setmayor":
+            set tab completions for position 3 to all players
+
+
+options:
+    gui: "街の一覧"
+command /citylist:
+    trigger:
+        cityList(player)
+function cityList(p: player):
+    set {_inv} to chest with 6 row named {@gui}
+    loop 54 times:
+        add 1 to {_S}
+        set slot ({_S}-1) of {_inv} to gray stained glass pane named "&7"
+    set {_S} to 10
+    loop {City::*}:
+        set {_id} to loop-index
+        {City::%{_id}%::Icon} is air:
+            set {City::%{_id}%::Icon} to grass
+        set {_l::1} to "&8ID %{_id}%"
+        set {_l::2} to "&7場所 %vector of {City::%{_id}%::SpawnPoint}%, %world of {City::%{_id}%::SpawnPoint}%"
+        set {_l::3} to "&7人数 %amount of {CityCitizens.%{_id}%::*}%人"
+        {City::%{_id}%::Mayor} is set:
+            set {_l::4} to "&7市長 %{City::%{_id}%::Mayor}%"
+        set {_I} to {City::%{_id}%::Icon} with nbt "{city:%{_id}%}" named "&7» &f%{City::%{_id}%}%" with lore {_l::*}
+        set slot {_S} of {_inv} to {_I}
+        add 1 to {_S}
+        mod({_S}, 9) = 8
+        add 2 to {_S}
+    open {_inv} to {_p}
+inventory click:
+    name of player's current inventory is {@gui}
+    cancel event
+command /gotocity:
+    trigger:
+        teleport player to {City::%{Pdata::%player's uuid%::City}%::SpawnPoint}

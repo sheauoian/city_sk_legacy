@@ -1,0 +1,124 @@
+# 戸籍変更の為の諸システム
+function changePlayerCity(p: player, id: text = "_random_"):
+    set {_u} to {_p}'s uuid
+    if {_id} is "_random_":
+        send "&7*戸籍のランダム出生が行われます" to {_p}
+        loop {City::*}:
+            add loop-index to {_Cities::*}
+        set {_id} to random element out of {_Cities::*}
+    if {CityCitizens.%{Pdata::%{_u}%::City}%::%{_u}%} is set:
+        delete {CityCitizens.%{Pdata::%{_u}%::City}%::%{_u}%}
+    set {Pdata::%{_u}%::City} to {_id}
+    set {CityCitizens.%{_id}%::%{_u}%} to {_p}
+    send "戸籍が %{City::%{_id}%}% &fになりました" to {_p}
+    teleport {_p} to {City::%{_id}%::Spawnpoint}
+command /_test_changeplayercity [<text>]:
+    permission: admin
+    trigger:
+        set {_id} to arg ? "_random_"
+        changePlayerCity(player, {_id})
+command /koseki [<player>]:
+    trigger:
+        set {_p} to arg ? player
+        set {_u} to {_p}'s uuid
+        send "&e%{_p}%の戸籍: %{City::%{Pdata::%{_u}%::City}%}%"
+load:
+    loop all players:
+        checkPlayerCity(loop-player)
+join:
+    checkPlayerCity(player)
+function checkPlayerCity(p: player):
+    set {_u} to {_p}'s uuid
+    if {Pdata::%{_u}%::City} is not set:
+        changePlayerCity({_p})
+    else if {City::%{Pdata::%{_u}%::City}%} is not set:
+        send "戸籍を持っていた街[&b%{Pdata::%{_u}%::City}%&f] が存在しません" to {_p}
+        changePlayerCity({_p})
+    if {CityCitizens.%{Pdata::%{_u}%::City}%::%{_u}%} is not set:
+        set {CityCitizens.%{Pdata::%{_u}%::City}%::%{_u}%} to player
+command /deleteplayercity:
+    permission: admin
+    trigger:
+        delete {Pdata::%player's uuid%::City}
+        send "戸籍を削除しました (再参加時にランダム出生の処理が行われます)"
+
+
+
+
+
+# ユーザーの戸籍変更用GUI
+options:
+    check: "戸籍を変更しますか?"
+    gui: "戸籍を変更する"
+function changeCityGUI(p: player, check: boolean = false):
+    set {_u} to {_p}'S uuid
+    if {_check} is true:
+        metadata "change_city" of {_p} is not set:
+            stop
+        set {_id} to metadata "change_city" of {_p}
+        set {_inv} to chest with 3 row named {@check}
+        loop 27 times:
+            add 1 to {_S}
+            set slot ({_S}-1) of {_inv} to gray stained glass pane named "&a"
+        if {_p}'s money < 100000:
+            set {_1} to "&7   現在の所持金: &c%{_p}'s money + 0% &c円"
+        else:
+            set {_1} to "&7   現在の所持金: &a%{_p}'s money + 0% &a円"
+        set {_I} to {City::%{_id}%::Icon} named "&a» &f戸籍を %{City::%{_id}%}% &fに変更する" with lore "&7 - 戸籍変更には &6&l100,000円 &7が必要です", {_1}, "" and "&f&nクリックで変更する"
+        set slot 13 of {_inv} to {_I}
+        set slot 10 of {_inv} to barrier named "&c» &f前の画面に戻る"
+    else:
+        set {_inv} to chest with 6 row named {@gui}
+        loop 54 times:
+            add 1 to {_S}
+            set slot ({_S}-1) of {_inv} to gray stained glass pane named "&7"
+        set {_S} to 10
+        loop {City::*}:
+            set {_id} to loop-index
+            {City::%{_id}%::Icon} is air:
+                set {City::%{_id}%::Icon} to grass
+            set {_l::1} to "&8ID %{_id}%"
+            set {_l::2} to "&7場所 %vector of {City::%{_id}%::SpawnPoint}%, %world of {City::%{_id}%::SpawnPoint}%"
+            {City::%{_id}%::Mayor} is set:
+                set {_l::3} to "&7市長 %{City::%{_id}%::Mayor}%"
+            set {_I} to {City::%{_id}%::Icon} with nbt "{city:%{_id}%}" named "&7» &f%{City::%{_id}%}%" with lore {_l::*}
+            set slot {_S} of {_inv} to {_I}
+            add 1 to {_S}
+            mod({_S}, 9) = 8
+            add 2 to {_S}
+    open {_inv} to {_p}
+command /change_city:
+    trigger:
+        changeCityGUI(player)
+inventory click:
+    if name of player's current inventory is {@check}:
+        cancel event
+        clicked slot is 10:
+            changeCityGUI(player)
+        clicked slot is 13
+        close player's inventory
+        metadata "change_city" of player is set
+        set {_id} to metadata "change_city" of player
+        if player's money < 100000:
+            send "&c&lお金が足りません! &fあと %100000 - player's money% 円必要です"
+            stop
+        remove 100000 from player's money
+        add 100000 to {City::%{_id}%::Mayor}'s money
+        {City::%{_id}%::Mayor} is online:
+            send "&e%player% &fが新たに %{City::%{_id}%}% &fへ戸籍登録を行い、&6&l100000円&f を得ました" to {City::%{_id}%::Mayor}
+        changePlayerCity(player, {_id})
+    else if name of player's current inventory is {@gui}:
+        cancel event
+        tag "city" of nbt of clicked item is set
+        set {_id} to tag "city" of nbt of clicked item
+        {City::%{_id}%} is set
+        {Pdata::%player's uuid%::City} is {_id}:
+            send "あなたは既にこの街の戸籍を持っています" 
+            stop
+        set metadata "change_city" of player to {_id}
+        changeCityGUI(player, true)
+command /playercitylist:
+    permission: admin
+    trigger:
+        loop all players:
+            send "%loop-player%: %{Pdata::%loop-player's uuid%::City}%"

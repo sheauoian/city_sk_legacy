@@ -1,0 +1,24 @@
+command /goldfarm [<text>]:
+    permission: admin
+    trigger:
+        if arg is "setitem":
+            player's tool is not air
+            set {GoldfarmItem} to 1 of player's tool
+            send "手に持っているアイテムで設定しました"
+        if arg is "getitem":
+            give player {GoldfarmItem}
+        else:
+            give player gold nugget named "&6"
+tab complete of "/goldfarm":
+    set tab completions for position 1 to "setitem" and "getitem"
+break of wheat plant, potato plant or carrot plant:
+    chance of 1%:
+        giveGoldfarmItem(player)
+break of beetroot plant:
+    chance of 1.33%:
+        giveGoldfarmItem(player)
+
+function giveGoldfarmItem(p: player):
+    #send "" oto {_p}
+    play sound "entity.experience_orb.pickup" from master category at pitch 2 for {_p}
+    give {_p} {GoldfarmItem}
